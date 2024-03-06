@@ -205,11 +205,11 @@ class Exp_Main(Exp_Basic):
 
                 preds.append(pred)
                 trues.append(true)
-                if i % 20 == 0:
+                if i % 10 == 0:
                     input = batch_x.detach().cpu().numpy()
                     gt = np.concatenate((input[0, :, -1], true[0, :, -1]), axis=0)
                     pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
-                    visual(gt, pd, os.path.join(folder_path, str(i) + '.pdf'))
+                    visual(gt, pd, os.path.join(folder_path, str(i) + '.png'))
 
         preds = np.concatenate(preds, axis=0)
         trues = np.concatenate(trues, axis=0)
