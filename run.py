@@ -6,12 +6,7 @@ import random
 import numpy as np
 
 
-def main():
-    fix_seed = 2021
-    random.seed(fix_seed)
-    torch.manual_seed(fix_seed)
-    np.random.seed(fix_seed)
-
+def parse_arguments():
     parser = argparse.ArgumentParser(description='Autoformer & Transformer family for Time Series Forecasting')
 
     # basic config
@@ -77,7 +72,36 @@ def main():
     parser.add_argument('--use_multi_gpu', action='store_true', help='use multiple gpus', default=False)
     parser.add_argument('--devices', type=str, default='0,1,2,3', help='device ids of multile gpus')
 
-    args = parser.parse_args()
+    return parser.parse_args()
+
+def build_settings_str_from_args(args, ii):
+    setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(
+        args.model_id,
+        args.model,
+        args.data,
+        args.features,
+        args.seq_len,
+        args.label_len,
+        args.pred_len,
+        args.d_model,
+        args.n_heads,
+        args.e_layers,
+        args.d_layers,
+        args.d_ff,
+        args.factor,
+        args.embed,
+        args.distil,
+        args.des, ii)
+    return setting
+
+
+def main():
+    fix_seed = 2021
+    random.seed(fix_seed)
+    torch.manual_seed(fix_seed)
+    np.random.seed(fix_seed)
+
+    args = parse_arguments()
 
     args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False
 
@@ -95,23 +119,7 @@ def main():
     if args.is_training:
         for ii in range(args.itr):
             # setting record of experiments
-            setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(
-                args.model_id,
-                args.model,
-                args.data,
-                args.features,
-                args.seq_len,
-                args.label_len,
-                args.pred_len,
-                args.d_model,
-                args.n_heads,
-                args.e_layers,
-                args.d_layers,
-                args.d_ff,
-                args.factor,
-                args.embed,
-                args.distil,
-                args.des, ii)
+            setting = build_settings_str_from_args(args, ii)
 
             exp = Exp(args)  # set experiments
             print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
@@ -127,22 +135,7 @@ def main():
             torch.cuda.empty_cache()
     else:
         ii = 0
-        setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(args.model_id,
-                                                                                                      args.model,
-                                                                                                      args.data,
-                                                                                                      args.features,
-                                                                                                      args.seq_len,
-                                                                                                      args.label_len,
-                                                                                                      args.pred_len,
-                                                                                                      args.d_model,
-                                                                                                      args.n_heads,
-                                                                                                      args.e_layers,
-                                                                                                      args.d_layers,
-                                                                                                      args.d_ff,
-                                                                                                      args.factor,
-                                                                                                      args.embed,
-                                                                                                      args.distil,
-                                                                                                      args.des, ii)
+        setting = build_settings_str_from_args(args, ii)
 
         exp = Exp(args)  # set experiments
         print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))

@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 RESULT_DIR = "./results"
-EXPERIMENT = "Exchange_96_96_Autoformer_custom_ftS_sl96_ll48_pl96_dm512_nh8_el2_dl1_df2048_fc1_ebtimeF_dtTrue_Exp_0"
+EXPERIMENT = "Exchange_96_96_Autoformer_custom_ftMS_sl500_ll10_pl30_dm32_nh8_el2_dl2_df32_fc3_ebtimeF_dtTrue_Exp_0"
 
 seq_length = int(EXPERIMENT.split("_sl")[-1].split("_")[0])
 label_length = int(EXPERIMENT.split("_ll")[-1].split("_")[0])
@@ -36,8 +36,8 @@ def plot_prediction_and_gt(pred, gt, seq_length, plot_features=None):
     axs = np.reshape(axs, (-1,))
 
     for idx in range(num_plots):
-        for seq_idx in range(0, num_sequences, seq_length+1):
-            x = range(seq_idx, seq_idx+seq_length)
+        for seq_idx in range(0, num_sequences, pred_length+1):
+            x = range(seq_idx, seq_idx+pred_length)
             p, = axs[idx].plot(x, pred[seq_idx, :, idx], 'g', label="Prediction")
             g, = axs[idx].plot(x, gt[seq_idx, :, idx], 'r', label="Ground Truth")
 
