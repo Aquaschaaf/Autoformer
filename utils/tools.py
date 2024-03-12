@@ -72,7 +72,7 @@ class StandardScaler():
         return (data * self.std) + self.mean
 
 
-def visual(true, preds=None, name='./pic/test.pdf'):
+def visual(true, preds=None, name='./pic/test.pdf', std=None):
     """
     Results visualization
     """
@@ -80,5 +80,8 @@ def visual(true, preds=None, name='./pic/test.pdf'):
     plt.plot(true, label='GroundTruth', linewidth=2)
     if preds is not None:
         plt.plot(preds, label='Prediction', linewidth=2)
+    if std is not None:
+        plt.fill_between([true[0]], [true[0]], [true[0]])  # Dummy to make colors match
+        plt.fill_between(list(range(len(preds)))[-len(std):], preds - std, preds + std, alpha=0.5)
     plt.legend()
     plt.savefig(name, bbox_inches='tight')

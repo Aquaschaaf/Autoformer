@@ -182,6 +182,7 @@ class Exp_Main(Exp_Basic):
 
         preds = []
         trues = []
+        final_inputs = []
         folder_path = './test_results/' + setting + '/'
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
@@ -197,25 +198,29 @@ class Exp_Main(Exp_Basic):
 
                 outputs, batch_y = self._predict(batch_x, batch_y, batch_x_mark, batch_y_mark)
 
+                input = batch_x.detach().cpu().numpy()
                 outputs = outputs.detach().cpu().numpy()
                 batch_y = batch_y.detach().cpu().numpy()
 
                 pred = outputs  # outputs.detach().cpu().numpy()  # .squeeze()
                 true = batch_y  # batch_y.detach().cpu().numpy()  # .squeeze()
+                final_input = input[:, -1, -1]
 
                 preds.append(pred)
                 trues.append(true)
+                final_inputs.append(final_input)
                 if i % 10 == 0:
-                    input = batch_x.detach().cpu().numpy()
                     gt = np.concatenate((input[0, :, -1], true[0, :, -1]), axis=0)
                     pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
                     visual(gt, pd, os.path.join(folder_path, str(i) + '.png'))
 
         preds = np.concatenate(preds, axis=0)
         trues = np.concatenate(trues, axis=0)
+        final_inputs = np.concatenate(final_inputs, axis=0)
         print('test shape:', preds.shape, trues.shape)
         preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
         trues = trues.reshape(-1, trues.shape[-2], trues.shape[-1])
+        final_inputs = final_inputs.reshape(-1)
         print('test shape:', preds.shape, trues.shape)
 
         # result save
@@ -235,6 +240,7 @@ class Exp_Main(Exp_Basic):
         np.save(folder_path + 'metrics.npy', np.array([mae, mse, rmse, mape, mspe]))
         np.save(folder_path + 'pred.npy', preds)
         np.save(folder_path + 'true.npy', trues)
+        np.save(folder_path + 'final_inputs.npy', final_inputs)
 
         return
 

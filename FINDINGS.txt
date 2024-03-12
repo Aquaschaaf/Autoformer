@@ -1,0 +1,20 @@
+
+Input x = 0 : 0 + seq_length
+Label y = seq_length - label_length : seq_length + label_length + pred_length
+
+- Cranking up the sequence length apparently doesnt help
+
+- Hohe labellength im Vergleich zu SeqLength (50-60) scheint Recall zu verbessern, rest aber zu verschlechtern
+
+
+
+
+
+METRICS:
+Accuracy tells us how many times the model made correct predictions in the entire dataset. It does not give us any class-specific information like which class boundaries were learned well, where the model was more confused, etc.
+Plus, in almost all real-world problems, the dataset is class imbalanced—different classes have different numbers of samples. In such cases, global accuracy is not a reliable indicator of the model’s quality.
+
+
+Precision is defined as the proportion of the positive class predictions that were actually correct.
+In other words, if a model classified a total of 100 samples to be of positive class, and 70 of them actually belonged
+to the positive class of the dataset (and 30 were negative class samples predicted incorrectly as “positive” by the classifier), then the precision is 70%.

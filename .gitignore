@@ -4,6 +4,8 @@ dataset/
 result.txt
 results/
 test_results/
+tmp/
+eval_results/
 
 
 # Byte-compiled / optimized / DLL files

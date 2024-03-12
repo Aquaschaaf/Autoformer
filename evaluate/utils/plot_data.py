@@ -3,7 +3,7 @@ import csv
 from datetime import datetime
 import numpy as np
 
-DATA_FILE = "/home/matthias/Projects/Autoformer/dataset/btc_usd/btc_usd.csv"
+from evaluate.utils.helpers import get_num_row_cols
 
 def find_date_format(example_date):
     date_fmt_candidates = ['%Y/%m/%d %H:%M', '%Y-%m-%d']
@@ -47,9 +47,7 @@ def plot_raw_data(data):
     dates = data["date"]
     del data["date"]
 
-    n_plots = len(data)
-    n_rows = int(np.ceil(np.sqrt(n_plots)))
-    n_cols = int(np.ceil(n_plots / n_rows))
+    n_rows, n_cols = get_num_row_cols(len(data))
 
     fig, axs = plt.subplots(n_rows, n_cols)
     axs = np.reshape(axs, (-1,))
@@ -61,6 +59,9 @@ def plot_raw_data(data):
         axs[i].set_title(col)
     plt.show()
 
-content_dict = load_data(DATA_FILE)
-plot_raw_data(content_dict)
+
+if __name__ == "__main__":
+    DATA_FILE = "/home/matthias/Projects/Autoformer/dataset/btc_usd/btc_usd.csv"
+    content_dict = load_data(DATA_FILE)
+    plot_raw_data(content_dict)
 
