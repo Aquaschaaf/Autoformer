@@ -4,10 +4,11 @@ import matplotlib.pyplot as plt
 from evaluate.utils.data_loading import get_settings_from_experiment_name, load_data
 from evaluate.utils.eval import eval_per_predicted_step, create_classification_metrics_per_step, create_error_metrics_per_step
 from evaluate.utils.helpers import write_metrics_to_file
+from evaluate.utils.simple_backtest import simple_backtest
 from evaluate.plot.plot_metrics import plot_metrics_per_step
 
 
-EXPERIMENT_DIR = "/home/matthias/Projects/Autoformer/results/Exchange_96_96_Autoformer_custom_ftMS_sl60_ll30_pl30_dm32_nh8_el2_dl2_df32_fc3_ebtimeF_dtTrue_Exp_0"
+EXPERIMENT_DIR = "/home/matthias/Projects/Autoformer/results/Forex_96_96_Autoformer_custom_ftMS_sl60_ll30_pl30_dm32_nh8_el2_dl2_df32_fc3_ebtimeF_dtTrue_Exp_0_MCSAMPLING"
 CLASS_BORDER = 0.0
 EVAL_DIR = "eval_results"
 SAMPLE_LIMIT = None
@@ -36,13 +37,20 @@ if SAMPLE_LIMIT is not None:
 
 # Evaluate classification
 pred_classes, true_classes, pct_errors = eval_per_predicted_step(pred_data, CLASS_BORDER)
-c_metrics = create_classification_metrics_per_step(pred_classes, true_classes)
-e_metrics = create_error_metrics_per_step(pct_errors)
+# c_metrics = create_classification_metrics_per_step(pred_classes, true_classes)
+# e_metrics = create_error_metrics_per_step(pct_errors)
+#
+# write_metrics_to_file(metrics_file, {**c_metrics, **e_metrics}, CLASS_BORDER)
+# plot_metrics_per_step(c_metrics, save_name=os.path.join(results_dir, "classification_metrics.png"))
+# plot_metrics_per_step(e_metrics, save_name=os.path.join(results_dir, "error_metrics.png"))
 
-write_metrics_to_file(metrics_file, {**c_metrics, **e_metrics}, CLASS_BORDER)
+simple_backtest(pred_data["final_input"], pred_classes, use_step=10)
 
-plot_metrics_per_step(c_metrics, save_name=os.path.join(results_dir, "classification_metrics.png"))
-plot_metrics_per_step(e_metrics, save_name=os.path.join(results_dir, "error_metrics.png"))
 plt.show()
+
+
+# if __name__ == "__main__":
+#     # run_evaluation()
+#     pass
 
 

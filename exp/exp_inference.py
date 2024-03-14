@@ -45,7 +45,7 @@ class Exp_Inference(Exp_Main):
         return outputs, batch_y
 
 
-    def test(self, setting, test=0):
+    def test(self, setting, sample_limit=None, test=0):
         test_data, test_loader = self._get_data(flag='test')
         if test:
             print('loading model')
@@ -74,9 +74,17 @@ class Exp_Inference(Exp_Main):
 
         with torch.no_grad():
             for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
+                if sample_limit is not None:
+                    if i >= sample_limit/batch_x.shape[0]:
+                        break
+                if i % 1000 == 0:
+                    s_num = 1 if sample_limit is None else sample_limit/batch_x.shape[0]
+                    max_samples = np.max([len(test_loader), s_num])
+                    print("Processing test sample {}/{}".format(i, max_samples))
+
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float().to(self.device)
-
+Matthi
                 batch_x_mark = batch_x_mark.float().to(self.device)
                 batch_y_mark = batch_y_mark.float().to(self.device)
 
@@ -104,7 +112,7 @@ class Exp_Inference(Exp_Main):
                 stds.append(std)
                 trues.append(true)
                 final_inputs.append(final_input)
-                if i % 10 == 0:
+                if i % 20 == 0:
                     gt = np.concatenate((input[0, :, -1], true[0, :, -1]), axis=0)
                     pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
                     _std = np.concatenate((np.zeros(len(input[0, :, -1])), std[0, :, -1]), axis=0)

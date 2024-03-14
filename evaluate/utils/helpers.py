@@ -13,6 +13,6 @@ def write_metrics_to_file(save_file, metrics, class_border):
         for metric, values in metrics.items():
             file.write("\n" + metric + "\n")
             line = "Average: {}".format(np.mean(values))
-            line += "\tMin: {} (Step {})".format(np.min(values[1:]), np.argmin(values[1:]))
-            line += "\tMax: {} (Step {})\n".format(np.max(values[1:]), np.argmax(values[1:]))
+            line += "\tMin: {} (Step {})".format(np.min(values), np.argmin(values))
+            line += "\tMax: {} (Step {})\n".format(np.max(values), np.argmax(values))
             file.write(line)
