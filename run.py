@@ -5,6 +5,8 @@ from exp.exp_main import Exp_Main
 import random
 import numpy as np
 
+from data_provider.technical_analysis import DEFAULT_STRATEGY
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Autoformer & Transformer family for Time Series Forecasting')
@@ -25,6 +27,7 @@ def parse_arguments():
     parser.add_argument('--freq', type=str, default='h',
                         help='freq for time features encoding, options:[s:secondly, t:minutely, h:hourly, d:daily, b:business days, w:weekly, m:monthly], you can also use more detailed freq like 15min or 3h')
     parser.add_argument('--checkpoints', type=str, default='./checkpoints/', help='location of model checkpoints')
+    parser.add_argument('--no_tech_ind', action='store_true', default=False, help='if technical indicators get added to data')
 
     # forecasting task
     parser.add_argument('--seq_len', type=int, default=96, help='input sequence length')
@@ -102,6 +105,11 @@ def main():
     np.random.seed(fix_seed)
 
     args = parse_arguments()
+    if not args.no_tech_ind and args.data == 'ohlcv':
+        d_args = vars(args)
+        d_args["enc_in"] = d_args["enc_in"] + len(DEFAULT_STRATEGY.ta)
+        d_args["dec_in"] = d_args["dec_in"] + len(DEFAULT_STRATEGY.ta)
+        d_args["c_out"] = d_args["c_out"] + len(DEFAULT_STRATEGY.ta)
 
     args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False
 

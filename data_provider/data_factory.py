@@ -1,4 +1,4 @@
-from data_provider.data_loader import Dataset_ETT_hour, Dataset_ETT_minute, Dataset_Custom, Dataset_Pred
+from data_provider.data_loader import Dataset_ETT_hour, Dataset_ETT_minute, Dataset_Custom, Dataset_Pred, Dataset_OHLCV
 from torch.utils.data import DataLoader
 
 data_dict = {
@@ -7,6 +7,7 @@ data_dict = {
     'ETTm1': Dataset_ETT_minute,
     'ETTm2': Dataset_ETT_minute,
     'custom': Dataset_Custom,
+    'ohlcv': Dataset_OHLCV
 }
 
 
@@ -31,6 +32,7 @@ def data_provider(args, flag):
         batch_size = args.batch_size
         freq = args.freq
 
+    do_ta = False if (args.no_tech_ind or not Data == Dataset_OHLCV) else True
     data_set = Data(
         root_path=args.root_path,
         data_path=args.data_path,
@@ -39,7 +41,8 @@ def data_provider(args, flag):
         features=args.features,
         target=args.target,
         timeenc=timeenc,
-        freq=freq
+        freq=freq,
+        tech_analysis=do_ta
     )
     print(flag, len(data_set))
     data_loader = DataLoader(

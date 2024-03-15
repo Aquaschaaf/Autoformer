@@ -20,15 +20,21 @@ def eval_per_predicted_step(data, class_border, target_idx=-1):
     num_sequences = true.shape[0]
 
     pred_classes, true_classes, errors = [], [], []
+    pct_change_per_step = {"true": [], "pred": []}
     for seq_idx in range(num_sequences):
 
         fi = final_input[seq_idx]
         pct_pred = np.array([_pct_change(xi, fi) for xi in pred[seq_idx, :, target_idx]])
         pct_true = np.array([_pct_change(xi, fi) for xi in true[seq_idx, :, target_idx]])
 
+        correlation = np.corrcoef(pct_pred, pct_true)
+
         pred_classes.append((pct_pred >= class_border).astype(np.int32))
         true_classes.append((pct_true >= class_border).astype(np.int32))
         errors.append(pct_pred - pct_true)
+
+        pct_change_per_step["true"].append(pct_true)
+        pct_change_per_step["pred"].append(pct_pred)
 
         # Debug Plot
         # fig, (ax_raw, ax_pct, ax_class) = plt.subplots(3,1)
@@ -44,7 +50,10 @@ def eval_per_predicted_step(data, class_border, target_idx=-1):
         # ax_class.legend()
         # plt.show()
 
-    return np.array(pred_classes), np.array(true_classes), np.array(errors)
+    pct_change_per_step["true"] = np.array(pct_change_per_step["true"]).transpose()
+    pct_change_per_step["pred"] = np.array(pct_change_per_step["pred"]).transpose()
+
+    return np.array(pred_classes), np.array(true_classes), np.array(errors), pct_change_per_step
 
 def create_classification_metrics_per_step(pred_classes, true_classes, save_file=None):
 

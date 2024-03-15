@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import pandas as pd
 
 def get_settings_from_experiment_name(exp_name):
     seq_length = int(exp_name.split("_sl")[-1].split("_")[0])
@@ -30,3 +31,7 @@ def load_data(exp_dir):
     }
 
     return data
+
+def load_raw_data(file):
+
+    return pd.read_csv(file)

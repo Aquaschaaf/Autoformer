@@ -1,4 +1,7 @@
 import matplotlib.pyplot as plt
+import vectorbt as vbt
+
+import numpy as np
 
 def simple_backtest(curr_values, pred_classes, use_step=10):
 
@@ -46,5 +49,18 @@ def simple_backtest(curr_values, pred_classes, use_step=10):
 
     plt.figure()
     plt.plot(cap_over_time[0:5000])
+    plt.show()
+
+def backtest(history, pred_classes, init_cash=100_000, fees=0.0025, slippage=0.0025, use_step=10):
+
+    entries = pred_classes[:, use_step] == 1
+    exits = pred_classes[:, use_step] == 0
+
+    pf = vbt.Portfolio.from_signals(history, entries=entries, exits=exits, freq="D", init_cash=init_cash, fees=fees, slippage=slippage)
+
+    # Print Portfolio Stats and Return Stats
+    print(pf.stats())
+    print(pf.returns_stats())
+    pf.plot().show()
     plt.show()
 
