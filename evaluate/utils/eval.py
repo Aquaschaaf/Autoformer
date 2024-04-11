@@ -13,6 +13,22 @@ def eval_per_predicted_step(data, class_border, target_idx=-1):
         except ZeroDivisionError:
             return 0.
 
+    def assign_classes(data, class_border):
+
+        class_labels = np.empty_like(data)
+
+        msk = data < class_border["short"]
+        class_labels[msk] = 0
+
+        msk = np.ma.masked_inside(data, class_border["short"], class_border["long"]).mask
+        class_labels[msk] = 1
+
+        msk = (data >= class_border["long"])
+        class_labels[msk] = 2
+
+        return class_labels.astype(np.int32)
+
+
     true = data["true"]
     pred = data["pred"]
     final_input = data["final_input"]
@@ -29,8 +45,10 @@ def eval_per_predicted_step(data, class_border, target_idx=-1):
 
         correlation = np.corrcoef(pct_pred, pct_true)
 
-        pred_classes.append((pct_pred >= class_border).astype(np.int32))
-        true_classes.append((pct_true >= class_border).astype(np.int32))
+        pred_classes.append(assign_classes(pct_pred, class_border))
+        # pred_classes.append((pct_pred >= class_border).astype(np.int32))
+        true_classes.append(assign_classes(pct_true, class_border))
+        # true_classes.append((pct_true >= class_border).astype(np.int32))
         errors.append(pct_pred - pct_true)
 
         pct_change_per_step["true"].append(pct_true)
@@ -62,13 +80,13 @@ def create_classification_metrics_per_step(pred_classes, true_classes, save_file
     for step_idx in range(n_steps):
 
         step_metrics = {}
-        pred = pred_classes[:, step_idx]
-        true = true_classes[:, step_idx]
+        pred = pred_classes[:, step_idx].reshape((-1, 1))
+        true = true_classes[:, step_idx].reshape((-1, 1))
 
         step_metrics["average_precision"] = average_precision_score(true, pred)
         step_metrics["accuracy"] = accuracy_score(true, pred)
-        step_metrics["precision"] = precision_score(true, pred)
-        step_metrics["recall"] = recall_score(true, pred)
+        step_metrics["precision"] = precision_score(true, pred, average='micro')
+        step_metrics["recall"] = recall_score(true, pred, average='micro')
 
         metrics["{}".format(step_idx)] = step_metrics
 

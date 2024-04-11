@@ -13,6 +13,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch import optim
+from torch.utils.tensorboard import SummaryWriter
+from torchvision.transforms import ToTensor
+import PIL.Image
 
 import os
 import time
@@ -52,6 +55,28 @@ class Exp_Main(Exp_Basic):
         criterion = nn.MSELoss()
         return criterion
 
+    def _add_images_to_tensorboard(self, x, y, pred, writer, index, name, num_images=5):
+
+        if isinstance(x, torch.Tensor):
+            x = x.cpu().detach().numpy()
+        if isinstance(y, torch.Tensor):
+            y = y.cpu().detach().numpy()
+        if isinstance(pred, torch.Tensor):
+            pred = pred.cpu().detach().numpy()
+
+        images = []
+        for idx in range(0, x.shape[0], num_images):
+            gt = np.concatenate((x[idx, :, -1], y[idx, :, -1]), axis=0)
+            pd = np.concatenate((x[idx, :, -1], pred[idx, :, -1]), axis=0)
+            fig_data = visual(gt, pd, "", return_fig=True)
+            image = PIL.Image.open(fig_data)
+            image = ToTensor()(image).unsqueeze(0)
+            images.append(image)
+        images = torch.cat(images)
+
+        # img_grid = torchvision.utils.make_grid(images)
+        writer.add_image('images/{}'.format(name), images, index, dataformats='NCHW')
+
     def _predict(self, batch_x, batch_y, batch_x_mark, batch_y_mark):
         # decoder input
         dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
@@ -76,7 +101,7 @@ class Exp_Main(Exp_Basic):
 
         return outputs, batch_y
 
-    def vali(self, vali_data, vali_loader, criterion):
+    def vali(self, vali_data, vali_loader, criterion, writer=None, epoch=None, name=None):
         total_loss = []
         self.model.eval()
         with torch.no_grad():
@@ -95,6 +120,11 @@ class Exp_Main(Exp_Basic):
                 loss = criterion(pred, true)
 
                 total_loss.append(loss)
+
+        # Write image to tensorboard
+        if writer is not None:
+            self._add_images_to_tensorboard(batch_x, batch_y, outputs, writer, epoch, name)
+
         total_loss = np.average(total_loss)
         self.model.train()
         return total_loss
@@ -119,6 +149,8 @@ class Exp_Main(Exp_Basic):
         if self.args.use_amp:
             scaler = torch.cuda.amp.GradScaler()
 
+        writer = SummaryWriter('tensorboard/{}'.format(setting))
+        all_iterations = 0
         for epoch in range(self.args.train_epochs):
             iter_count = 0
             train_loss = []
@@ -127,6 +159,7 @@ class Exp_Main(Exp_Basic):
             epoch_time = time.time()
             for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(train_loader):
                 iter_count += 1
+                all_iterations += 1
                 model_optim.zero_grad()
                 batch_x = batch_x.float().to(self.device)
 
@@ -138,6 +171,8 @@ class Exp_Main(Exp_Basic):
 
                 loss = criterion(outputs, batch_y)
                 train_loss.append(loss.item())
+
+                writer.add_scalar("loss/train_iteration", loss, all_iterations)
 
                 if (i + 1) % 100 == 0:
                     print("\titers: {0}, epoch: {1} | loss: {2:.7f}".format(i + 1, epoch + 1, loss.item()))
@@ -155,10 +190,18 @@ class Exp_Main(Exp_Basic):
                     loss.backward()
                     model_optim.step()
 
+            # Write image to tensorboard
+            self._add_images_to_tensorboard(batch_x, batch_y, outputs, writer, epoch, "train")
+
             print("Epoch: {} cost time: {}".format(epoch + 1, time.time() - epoch_time))
             train_loss = np.average(train_loss)
-            vali_loss = self.vali(vali_data, vali_loader, criterion)
-            test_loss = self.vali(test_data, test_loader, criterion)
+            vali_loss = self.vali(vali_data, vali_loader, criterion, writer=writer, epoch=epoch, name="vali")
+            test_loss = self.vali(test_data, test_loader, criterion, writer=writer, epoch=epoch, name="test")
+
+            writer.add_scalar("loss/train_epoch", train_loss, epoch)
+            writer.add_scalar("loss/validation", vali_loss, epoch)
+            writer.add_scalar("loss/test", test_loss, epoch)
+            writer.add_scalar("learning_rate/epoch", model_optim.param_groups[0]['lr'], epoch)
 
             print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
                 epoch + 1, train_steps, train_loss, vali_loss, test_loss))

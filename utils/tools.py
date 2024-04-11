@@ -1,3 +1,4 @@
+import io
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
@@ -72,11 +73,11 @@ class StandardScaler():
         return (data * self.std) + self.mean
 
 
-def visual(true, preds=None, name='./pic/test.pdf', std=None):
+def visual(true, preds=None, name='./pic/test.pdf', std=None, return_fig=False):
     """
     Results visualization
     """
-    plt.figure()
+    fig = plt.figure()
     plt.plot(true, label='GroundTruth', linewidth=2)
     if preds is not None:
         plt.plot(preds, label='Prediction', linewidth=2)
@@ -84,4 +85,11 @@ def visual(true, preds=None, name='./pic/test.pdf', std=None):
         plt.fill_between([true[0]], [true[0]], [true[0]])  # Dummy to make colors match
         plt.fill_between(list(range(len(preds)))[-len(std):], preds - std, preds + std, alpha=0.5)
     plt.legend()
-    plt.savefig(name, bbox_inches='tight')
+
+    if return_fig:
+        buf = io.BytesIO()
+        plt.savefig(buf, format='jpeg')
+        buf.seek(0)
+        return buf
+    else:
+        plt.savefig(name, bbox_inches='tight')

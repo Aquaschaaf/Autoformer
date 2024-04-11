@@ -48,8 +48,6 @@ def plot_correlation_pred_true_pct(data):
     plt.title("Predicted and True Pct Change for step {} (max correlation)".format(max_correlation))
     plt.ylabel("Value")
 
-    plt.show()
-
 
 
 

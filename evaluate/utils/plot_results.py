@@ -35,7 +35,7 @@ def plot_prediction_and_gt(pred, gt, pred_length, plot_features=None):
 
 if __name__ == "__main__":
     RESULT_DIR = "../../results"
-    EXPERIMENT = "Forex_96_96_Autoformer_custom_ftMS_sl60_ll30_pl30_dm32_nh8_el2_dl2_df32_fc3_ebtimeF_dtTrue_Exp_0_MCSAMPLING"
+    EXPERIMENT = "BTC_Autoformer_ohlcv_ftMS_sl60_ll30_pl30_dm512_nh8_el2_dl2_df2048_fc3_ebtimeF_dtTrue_'Exp'_0"
     experiment_dir = os.path.join(RESULT_DIR, EXPERIMENT)
 
     seq_length, pred_length = get_settings_from_experiment_name(EXPERIMENT)

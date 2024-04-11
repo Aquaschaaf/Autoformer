@@ -325,8 +325,18 @@ class Dataset_OHLCV(Dataset):
             df_raw.drop(columns=['Volume_(BTC)'], inplace=True)
         if "Volume_(Currency)" in cols:
             df_raw = df_raw.rename(columns={"Volume_(Currency)": 'Volume'})
-        if "Volume_(Currency)" in cols:
+        if "Volume BTC" in cols:
+            df_raw.drop(columns=['Volume BTC'], inplace=True)
+        if "Volume USD" in cols:
+            df_raw = df_raw.rename(columns={"Volume USD": 'Volume'})
+
+        if "Timestamp" in cols:
             df_raw = df_raw.rename(columns={"Timestamp": 'date'})
+        if "unix" in cols:
+            df_raw.drop(columns=['unix'], inplace=True)
+        if "symbol" in cols:
+            df_raw.drop(columns=['symbol'], inplace=True)
+
         if "Weighted_Price" in cols:
             df_raw.drop(columns=["Weighted_Price"], inplace=True)
 

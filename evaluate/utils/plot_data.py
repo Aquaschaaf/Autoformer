@@ -6,7 +6,8 @@ import numpy as np
 from evaluate.utils.helpers import get_num_row_cols
 
 def find_date_format(example_date):
-    date_fmt_candidates = ['%Y/%m/%d %H:%M', '%Y-%m-%d']
+
+    date_fmt_candidates = ['%Y/%m/%d %H:%M', '%Y-%m-%d', "%Y-%m-%d %H:%M:%S"]
     date_format = None
     for date_fmt_candidate in date_fmt_candidates:
         try:
@@ -38,7 +39,10 @@ def load_data(data_file):
             content_dict[col] = [datetime.strptime(c[i], date_format) for c in content]
             # content_dict[col] = [c[i] for c in content]
         else:
-            content_dict[col] = [float(c[i]) for c in content]
+            try:
+                content_dict[col] = [float(c[i]) for c in content]
+            except:
+                print("Failed to cast col {} to float. Skipping".format(col))
 
     return content_dict
 
@@ -52,16 +56,18 @@ def plot_raw_data(data):
     fig, axs = plt.subplots(n_rows, n_cols)
     axs = np.reshape(axs, (-1,))
 
+    num_data = len(dates)  # 1500
+
     for i, col in enumerate(data):
         if col == "date":
             continue
-        axs[i].plot(dates[-1500:], data[col][-1500:])
+        axs[i].plot(dates[-num_data:], data[col][-num_data:])
         axs[i].set_title(col)
     plt.show()
 
 
 if __name__ == "__main__":
-    DATA_FILE = "/home/matthias/Projects/Autoformer/dataset/btc_usd/btc_usd.csv"
+    DATA_FILE = "/home/matthias/Projects/Autoformer/dataset/btc_usd/BTC-Hourly.csv"
     content_dict = load_data(DATA_FILE)
     plot_raw_data(content_dict)
 

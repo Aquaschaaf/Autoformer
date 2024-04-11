@@ -6,6 +6,8 @@ results/
 test_results/
 tmp/
 eval_results/
+cache/*
+tensorboard/*
 
 
 # Byte-compiled / optimized / DLL files
