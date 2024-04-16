@@ -316,6 +316,9 @@ class Dataset_OHLCV(Dataset):
         self.data_path = data_path
         self.__read_data__()
 
+        if not scale:
+            print("Warning! Scale is switched off and percentage change is used. This is not the default behavior!")
+
     def __fix_columns(self, df_raw):
         cols = list(df_raw.columns)
         # =============================================================
@@ -345,9 +348,6 @@ class Dataset_OHLCV(Dataset):
     def __handle_nans(self, df):
         # Drop all rows where target is NaN
         df = df[df[self.target].notnull()]
-
-
-
         return df
 
     def __read_data__(self):
@@ -412,6 +412,10 @@ class Dataset_OHLCV(Dataset):
         self.data_y = data[border1:border2]
         self.data_stamp = data_stamp
 
+    def percentage_change(self, data):
+        # Calculate percentage change from the first entry
+        return (data - data[0]) / data[0]
+
     def __getitem__(self, index):
         s_begin = index
         s_end = s_begin + self.seq_len
@@ -422,6 +426,10 @@ class Dataset_OHLCV(Dataset):
         seq_y = self.data_y[r_begin:r_end]
         seq_x_mark = self.data_stamp[s_begin:s_end]
         seq_y_mark = self.data_stamp[r_begin:r_end]
+
+        if not self.scale:
+            seq_x = self.percentage_change(seq_x)
+            seq_y = self.percentage_change(seq_y)
 
         return seq_x, seq_y, seq_x_mark, seq_y_mark
 

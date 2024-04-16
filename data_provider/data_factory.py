@@ -42,6 +42,7 @@ def data_provider(args, flag):
         target=args.target,
         timeenc=timeenc,
         freq=freq,
+        scale=False,
         tech_analysis=do_ta
     )
     print(flag, len(data_set))

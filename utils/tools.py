@@ -77,13 +77,17 @@ def visual(true, preds=None, name='./pic/test.pdf', std=None, return_fig=False):
     """
     Results visualization
     """
-    fig = plt.figure()
+    plt.figure()
     plt.plot(true, label='GroundTruth', linewidth=2)
     if preds is not None:
         plt.plot(preds, label='Prediction', linewidth=2)
     if std is not None:
         plt.fill_between([true[0]], [true[0]], [true[0]])  # Dummy to make colors match
         plt.fill_between(list(range(len(preds)))[-len(std):], preds - std, preds + std, alpha=0.5)
+
+    curr_ylim = plt.gca().get_ylim()
+    ylim = [np.min([curr_ylim[0], -0.05]), np.max([curr_ylim[1], 0.05])]
+    plt.ylim(ylim)
     plt.legend()
 
     if return_fig:

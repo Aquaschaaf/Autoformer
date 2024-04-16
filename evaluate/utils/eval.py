@@ -40,8 +40,8 @@ def eval_per_predicted_step(data, class_border, target_idx=-1):
     for seq_idx in range(num_sequences):
 
         fi = final_input[seq_idx]
-        pct_pred = np.array([_pct_change(xi, fi) for xi in pred[seq_idx, :, target_idx]])
-        pct_true = np.array([_pct_change(xi, fi) for xi in true[seq_idx, :, target_idx]])
+        pct_pred = pred[seq_idx, :, target_idx]  # np.array([_pct_change(xi, fi) for xi in pred[seq_idx, :, target_idx]])
+        pct_true = true[seq_idx, :, target_idx]  # np.array([_pct_change(xi, fi) for xi in true[seq_idx, :, target_idx]])
 
         correlation = np.corrcoef(pct_pred, pct_true)
 

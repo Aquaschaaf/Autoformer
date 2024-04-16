@@ -5,16 +5,17 @@ import matplotlib.pyplot as plt
 from evaluate.utils.data_loading import get_settings_from_experiment_name, load_data
 from evaluate.utils.eval import eval_per_predicted_step, create_classification_metrics_per_step, create_error_metrics_per_step
 from evaluate.utils.helpers import write_metrics_to_file
-from evaluate.utils.backtest import simple_backtest, backtest
+from evaluate.utils.backtest import backtest
 from evaluate.plot.plot_metrics import plot_metrics_per_step, plot_correlation_pred_true_pct
 
 
 
-EXPERIMENT_DIR = "/home/matthias/Projects/Autoformer/results/BTC_Informer_ohlcv_ftS_sl60_ll30_pl30_dm512_nh8_el2_dl2_df2048_fc3_ebtimeF_dtTrue_'Exp'_0"
-# EXPERIMENT_DIR = "/home/matthias/Projects/Autoformer/results/BTC_Autoformer_ohlcv_ftMS_sl96_ll48_pl96_dm512_nh8_el2_dl1_df2048_fc3_ebtimeF_dtTrue_'Exp'_0"
-CLASS_BORDER = {"short": -0.01, "long": 0.01}
+EXPERIMENT_DIR = "/home/matthias/Projects/Autoformer/results/BTC_Informer_ohlcv_ftS_sl60_ll60_pl15_dm512_nh8_el2_dl1_df2048_fc3_ebtimeF_dtTrue_'Exp'_0"
+CLASS_BORDER = {"short": 0.0, "long": 0.05}
 EVAL_DIR = "eval_results"
 SAMPLE_LIMIT = None
+# RAW_DATA_FILE = "/home/matthias/Projects/Trading/data/dax/BAYN.DE_hourly.csv"
+# RAW_DATA_FILE = "/home/matthias/Projects/Trading/data/crypto/ETH-USD_hourly.csv"
 RAW_DATA_FILE = "/home/matthias/Projects/Autoformer/dataset/btc_usd/BTC-Hourly.csv"
 raw_data = pd.read_csv(RAW_DATA_FILE)
 exp_name = EXPERIMENT_DIR.split(os.sep)[-1]
@@ -50,7 +51,7 @@ plot_metrics_per_step(e_metrics, save_name=os.path.join(results_dir, "error_metr
 
 plot_correlation_pred_true_pct(pct_per_step)
 
-backtest(raw_data["Close"][-pred_classes.shape[0]:], pred_classes, fees=0.00, slippage=0.00, use_step=-1)
+backtest(raw_data["Close"][-pred_classes.shape[0]:], pred_classes, pred_data["pred"], use_step=int(pred_length/2))
 # simple_backtest(pred_data["final_input"], pred_classes, use_step=10)
 # Create the Signals Portfolio
 

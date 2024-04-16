@@ -13,13 +13,19 @@ import os
 import warnings
 import numpy as np
 
+import matplotlib.pyplot as plt
+
 warnings.filterwarnings('ignore')
+plt.switch_backend('TkAgg')
 
 
 class Exp_Inference(Exp_Main):
     def __init__(self, args):
         super(Exp_Inference, self).__init__(args)
+        self.plot_mc_samples = False
 
+        if self.plot_mc_samples:
+            print("Plotting of MC Samples is activated in calss Exp_Inference")
     def _predict(self, batch_x, batch_y, batch_x_mark, batch_y_mark):
         # decoder input
         dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
@@ -45,7 +51,35 @@ class Exp_Inference(Exp_Main):
         return outputs, batch_y
 
 
-    def test(self, setting, sample_limit=None, test=0):
+    def _plot_mc_samples(self, x, y, pred_samples, mean, std):
+        """
+        Results visualization
+        """
+        pred_length = mean.shape[1]
+        for idx in range(x.shape[0]):
+
+            gt = np.concatenate((x[idx, :, -1], y[idx, :, -1]), axis=0)
+            mean_pred = np.concatenate((x[idx, :, -1], mean[idx, :, -1]), axis=0)
+            sample_std = np.concatenate((np.zeros_like(x[idx, :, -1]), std[idx, :, -1]), axis=0)
+
+            plt.figure()
+            for s in range(pred_samples.shape[0]):
+                sample = np.concatenate((x[idx, :, -1], pred_samples[s, idx, :, -1]), axis=0)
+                plt.plot(sample, linewidth=1, alpha=0.3)
+            plt.plot(gt, label='GroundTruth', linewidth=2)
+            plt.plot(mean_pred, label='Prediction', linewidth=2)
+            plt.fill_between([gt[0]], [gt[0]], [gt[0]])  # Dummy to make colors match
+            plt.fill_between(list(range(len(mean_pred))), mean_pred - sample_std, mean_pred + sample_std, alpha=0.3)
+
+            curr_ylim = plt.gca().get_ylim()
+            ylim = [np.min([curr_ylim[0], -0.05]), np.max([curr_ylim[1], 0.05])]
+            plt.ylim(ylim)
+            plt.legend()
+
+            plt.show()
+
+
+    def test(self, setting, sample_limit=None, test=0, out_dir_suffix=None):
         test_data, test_loader = self._get_data(flag='test')
         if test:
             print('loading model')
@@ -55,7 +89,8 @@ class Exp_Inference(Exp_Main):
         stds = []
         trues = []
         final_inputs = []
-        folder_path = './test_results/' + setting + '/'
+        folder_path = './test_results/' + setting
+        folder_path = folder_path + out_dir_suffix if out_dir_suffix is not None else folder_path
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
@@ -66,9 +101,14 @@ class Exp_Inference(Exp_Main):
                 return [model] if len(children) == 0 else [ci for c in children for ci in get_layers(c)]
 
             layers = get_layers(self.model)
+            dropout_layers = []
             for layer in layers:
                 if isinstance(layer, nn.Dropout):
-                    layer.train()
+                    dropout_layers.append(layer)
+
+            print("Keeping Dropout active during inference for dropout_layer[-2]. Num do-layers: {}".format(len(dropout_layers)))
+            for layer in dropout_layers[:-2]:
+                layer.train()
 
         num_samples = self.args.mc_samples if self.args.mc_dropout else 1
 
@@ -84,7 +124,7 @@ class Exp_Inference(Exp_Main):
 
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float().to(self.device)
-Matthi
+
                 batch_x_mark = batch_x_mark.float().to(self.device)
                 batch_y_mark = batch_y_mark.float().to(self.device)
 
@@ -100,8 +140,11 @@ Matthi
                 input = batch_x.detach().cpu().numpy()
                 mean = mean.detach().cpu().numpy()
                 std = std.detach().cpu().numpy()
-                # outputs = outputs.detach().cpu().numpy()
                 batch_y = batch_y_out.detach().cpu().numpy()
+                if self.plot_mc_samples:
+                    print("Creating MC Plot...")
+                    all_outputs = all_outputs.detach().cpu().numpy()
+                    self._plot_mc_samples(input, batch_y, all_outputs, mean, std)
 
                 pred = mean  # outputs.detach().cpu().numpy()  # .squeeze()
                 std = std  # outputs.detach().cpu().numpy()  # .squeeze()
@@ -112,7 +155,7 @@ Matthi
                 stds.append(std)
                 trues.append(true)
                 final_inputs.append(final_input)
-                if i % 20 == 0:
+                if i % 10 == 0:
                     gt = np.concatenate((input[0, :, -1], true[0, :, -1]), axis=0)
                     pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
                     _std = np.concatenate((np.zeros(len(input[0, :, -1])), std[0, :, -1]), axis=0)
@@ -130,7 +173,8 @@ Matthi
         print('test shape:', preds.shape, trues.shape)
 
         # result save
-        folder_path = './results/' + setting + '/'
+        folder_path = './results/' + setting
+        folder_path = folder_path + out_dir_suffix if out_dir_suffix is not None else folder_path
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
@@ -143,11 +187,11 @@ Matthi
         f.write('\n')
         f.close()
 
-        np.save(folder_path + 'metrics.npy', np.array([mae, mse, rmse, mape, mspe]))
-        np.save(folder_path + 'pred.npy', preds)
-        np.save(folder_path + 'stds.npy', stds)
-        np.save(folder_path + 'true.npy', trues)
-        np.save(folder_path + 'final_inputs.npy', final_inputs)
+        np.save(os.path.join(folder_path, 'metrics.npy'), np.array([mae, mse, rmse, mape, mspe]))
+        np.save(os.path.join(folder_path + 'pred.npy'), preds)
+        np.save(os.path.join(folder_path + 'stds.npy'), stds)
+        np.save(os.path.join(folder_path + 'true.npy'), trues)
+        np.save(os.path.join(folder_path + 'final_inputs.npy'), final_inputs)
 
         return
 
