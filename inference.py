@@ -372,7 +372,7 @@ if __name__ == "__main__":
     if CREATE_PREDICTION_DATA:
         predictor = PredictionModel(MODEL_DIR)
         predictor.args.data_path = os.path.basename(DATA_FILE)
-        predictor.args.is_training = False
+        predictor.args.is_training = True
 
         seq_length = predictor.args.seq_len
         label_length = predictor.args.label_len
