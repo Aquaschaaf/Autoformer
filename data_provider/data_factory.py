@@ -43,7 +43,8 @@ def data_provider(args, flag):
         timeenc=timeenc,
         freq=freq,
         scale=False,
-        tech_analysis=do_ta
+        tech_analysis=do_ta,
+        is_training=args.is_training
     )
     print(flag, len(data_set))
     data_loader = DataLoader(

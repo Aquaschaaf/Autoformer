@@ -5,6 +5,7 @@ import os
 import numpy as np
 import pandas as pd
 from plotly.offline import plot
+import subprocess
 
 from utils.timefeatures import time_features
 import argparse
@@ -25,6 +26,9 @@ GT_COL = "GT"
 
 GT_SELL_THRESH = -0.01
 GT_BUY_THRESH = 0.01
+
+FEES = 0.0
+SLIPPAGE = 0.0
 
 def args_inference():
     N_MODEL_ITERATIONS = 1
@@ -99,30 +103,50 @@ def backtest(df):
         exits = predictions < sell_thresh
         return entries, exits
 
+    def set_false_in_series(series, indices, num_false):
+        series = series.astype(bool)
+        max_index = max(entries.index.tolist())
+        for index in indices:
+            end_index = min(index + num_false, max_index)
+            series.loc[index:end_index] = False
+        return series
+
     best_total_return = -10000
     best_pf = None
     best_thresholds = {"buy": None, "sell": None, "stop_loss": None}
     num_thresh_candidates = 10
-    for i in range(num_thresh_candidates):
-        for j in range(num_thresh_candidates):
-            for k in range(num_thresh_candidates):
+    for i in range(1, num_thresh_candidates):
+        for j in range(1, num_thresh_candidates):
+            for k in range(3, num_thresh_candidates):
+                for l in range(5, 30, 5):
 
-                buy_thresh = i/100.
-                sell_thresh = -j/100.
-                stop_loss = (k+3)/100.
+                    buy_thresh = i/100.
+                    sell_thresh = -j/100.
+                    stop_loss = k/100.
+                    sl_cooldown = l
 
-                entries, exits = create_signals(df[PREDICTION_COL], buy_thresh=buy_thresh, sell_thresh=sell_thresh)
-                pf = vbt.Portfolio.from_signals(df["Close"], entries=entries, exits=exits, sl_stop=stop_loss)  #   , slippage=0.0025, fixed_fees=0.5,
-                # tr = pf.stats()["Win Rate [%]"]  #
-                tr = pf.total_return()
-                print("B {}, S {}, StopLoss {}: {}".format(buy_thresh, sell_thresh, stop_loss, tr))
+                    entries, exits = create_signals(df[PREDICTION_COL], buy_thresh=buy_thresh, sell_thresh=sell_thresh)
+                    pf = vbt.Portfolio.from_signals(df["Close"], entries=entries, exits=exits, sl_stop=stop_loss, slippage=SLIPPAGE, fixed_fees=FEES)  #   , slippage=0.0025, fixed_fees=0.5,
 
-                if tr > best_total_return:
-                    best_pf = pf
-                    best_total_return = tr
-                    best_thresholds["buy"] = buy_thresh
-                    best_thresholds["sell"] = sell_thresh
-                    best_thresholds["stop_loss"] = stop_loss
+                    # ==========================================================================================
+                    # Identify days where stop loss was triggered
+                    stop_orders_ts = pf.exit_trades.records_readable['Exit Timestamp'].tolist()
+                    # Ensure the list contains valid indices
+                    entries = set_false_in_series(entries, stop_orders_ts, num_false=sl_cooldown)
+                    pf = vbt.Portfolio.from_signals(df["Close"], entries=entries, exits=exits,sl_stop=stop_loss, slippage=SLIPPAGE, fixed_fees=FEES)
+                    # ==========================================================================================
+
+                    # tr = pf.stats()["Win Rate [%]"]  #
+                    tr = pf.total_return()
+                    print("B {}, S {}, StopLoss {}, Cooldwon{}: {}".format(buy_thresh, sell_thresh, stop_loss, tr, sl_cooldown))
+
+                    if tr > best_total_return:
+                        best_pf = pf
+                        best_total_return = tr
+                        best_thresholds["buy"] = buy_thresh
+                        best_thresholds["sell"] = sell_thresh
+                        best_thresholds["stop_loss"] = stop_loss
+                        best_thresholds["sl_cooldown"] = sl_cooldown
 
     print("Best Thresholds: {}".format(best_thresholds))
     stats = best_pf.stats()
@@ -292,13 +316,17 @@ def summarize(best_thresholds, pf, metrics, out_dir, meta_info):
         out_str += sep_line
         return out_str
 
+    def get_git_revision_short_hash() -> str:
+        return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
 
     out_file = os.path.join(out_dir, "evaluation_summary.txt")
     plot(pf.plot(), filename=os.path.join(out_dir, 'portfolio.html'))
 
     with open(out_file, "w") as file:
+        file.write(create_section_header("META INFORMATION"))
         for info_name, info in meta_info.items():
             file.write("{}: {}\n".format(info_name, info))
+        file.write("Git commit: {}\n".format(get_git_revision_short_hash()))
         file.write(create_section_header("used thresholds"))
         file.write("{}\n".format(best_thresholds))
         for task, task_metrics in metrics.items():
@@ -329,6 +357,8 @@ if __name__ == "__main__":
     data_name = DATA_FILE.split(os.sep)[-1].split(".")[0]
     out_dir = os.path.join(BASE_OUT_DIR, model_name)
     out_file = os.path.join(out_dir, "{}_predictions.csv".format(data_name))
+    if not os.path.isdir(out_dir):
+        os.mkdir(out_dir)
 
     data = pd.read_csv(DATA_FILE)
     data["date"] = pd.to_datetime(data["date"], errors='coerce')
@@ -402,7 +432,7 @@ if __name__ == "__main__":
     pf, best_thresholds = backtest(data)
     metrics = generate_metrics(data, best_thresholds)
 
-    meta_info = {"Model": MODEL_DIR, "Dataset": DATA_FILE}
+    meta_info = {"Model": MODEL_DIR, "Dataset": DATA_FILE, "Fees": FEES, "Slippage": SLIPPAGE}
     summarize(best_thresholds, pf, metrics, out_dir, meta_info)
 
     plt.show()

@@ -290,7 +290,7 @@ class Dataset_Custom(Dataset):
 class Dataset_OHLCV(Dataset):
     def __init__(self, root_path, flag='train', size=None,
                  features='S', data_path='ETTh1.csv',
-                 target='OT', scale=True, timeenc=0, freq='h', tech_analysis=False):
+                 target='OT', scale=True, timeenc=0, freq='h', tech_analysis=False, is_training=False):
         # size [seq_len, label_len, pred_len]
         # info
         if size == None:
@@ -312,6 +312,7 @@ class Dataset_OHLCV(Dataset):
         self.timeenc = timeenc
         self.freq = freq
         self.tech_analysis = tech_analysis
+        self.is_training = is_training
 
         self.root_path = root_path
         self.data_path = data_path
@@ -463,7 +464,10 @@ class Dataset_OHLCV(Dataset):
         #     seq_x = self.percentage_change(seq_x)
         #     seq_y = self.percentage_change(seq_y)
 
-        return seq_x, seq_y, seq_x_mark, seq_y_mark, datetime
+        if self.is_training:
+            return seq_x, seq_y, seq_x_mark, seq_y_mark
+        else:
+            return seq_x, seq_y, seq_x_mark, seq_y_mark, datetime
 
     def __len__(self):
         return len(self.data_x) - self.seq_len - self.pred_len + 1
