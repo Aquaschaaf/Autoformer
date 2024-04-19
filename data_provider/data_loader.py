@@ -5,6 +5,7 @@ from sklearn.preprocessing import StandardScaler
 from utils.timefeatures import time_features
 import warnings
 
+import matplotlib.pyplot as plt
 from data_provider.technical_analysis import add_technical_indicators
 
 warnings.filterwarnings('ignore')
@@ -368,6 +369,10 @@ class Dataset_OHLCV(Dataset):
             df_raw, remove_rows = add_technical_indicators(df_raw)
             df_raw = df_raw.tail(len(df_raw) - remove_rows)
 
+        df_raw.date = pd.to_datetime(df_raw.date, errors="coerce")
+        df_raw.date = df_raw["date"].dt.tz_localize(None)
+        df_raw = df_raw.sort_values(by='date')
+
         cols = list(df_raw.columns)
         cols.remove(self.target)
         cols.remove('date')
@@ -398,6 +403,13 @@ class Dataset_OHLCV(Dataset):
 
         df_stamp = df_raw[['date']][border1:border2]
         df_stamp['date'] = pd.to_datetime(df_stamp.date)
+
+        data_freq = pd.infer_freq(df_stamp['date'])
+        start = df_stamp['date'].iloc[-1]
+        prediction_times = pd.date_range(start=start, periods=self.pred_len+1, freq=data_freq)
+        df_stamp = pd.DataFrame({'date': prediction_times}).merge(df_stamp, how='outer')
+
+        # Elongate df_stamp by length of prediction for decoder input
         if self.timeenc == 0:
             df_stamp['month'] = df_stamp.date.apply(lambda row: row.month, 1)
             df_stamp['day'] = df_stamp.date.apply(lambda row: row.day, 1)
@@ -412,26 +424,46 @@ class Dataset_OHLCV(Dataset):
         self.data_y = data[border1:border2]
         self.data_stamp = data_stamp
 
+        self.datetime = df_raw[border1:border2]["date"]
+
     def percentage_change(self, data):
         # Calculate percentage change from the first entry
         return (data - data[0]) / data[0]
 
     def __getitem__(self, index):
+
+        # self.tmp[["Close"]].plot()
+        # plt.show()
         s_begin = index
         s_end = s_begin + self.seq_len
+        s_length = s_end - s_begin
         r_begin = s_end - self.label_len
         r_end = r_begin + self.label_len + self.pred_len
+        r_length = r_end - r_begin
 
-        seq_x = self.data_x[s_begin:s_end]
-        seq_y = self.data_y[r_begin:r_end]
+        # Take a bigger slice to make sure the pct change is continuous
+        if True:
+            x_slice = self.data_x[s_begin:s_end]
+            y_slice = self.data_y[s_begin:r_end]
+            if not self.scale:
+                x_slice = self.percentage_change(x_slice)
+                y_slice = self.percentage_change(y_slice)
+
+            seq_x = x_slice[:s_length]
+            seq_y = y_slice[-r_length:]
+        else:
+            seq_x = self.data_x[s_begin:s_end]
+            seq_y = self.data_y[r_begin:r_end]
+
         seq_x_mark = self.data_stamp[s_begin:s_end]
         seq_y_mark = self.data_stamp[r_begin:r_end]
+        datetime = self.datetime[s_begin:s_end]
 
-        if not self.scale:
-            seq_x = self.percentage_change(seq_x)
-            seq_y = self.percentage_change(seq_y)
+        # if not self.scale:
+        #     seq_x = self.percentage_change(seq_x)
+        #     seq_y = self.percentage_change(seq_y)
 
-        return seq_x, seq_y, seq_x_mark, seq_y_mark
+        return seq_x, seq_y, seq_x_mark, seq_y_mark, datetime
 
     def __len__(self):
         return len(self.data_x) - self.seq_len - self.pred_len + 1

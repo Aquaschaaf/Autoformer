@@ -10,14 +10,18 @@ from evaluate.plot.plot_metrics import plot_metrics_per_step, plot_correlation_p
 
 
 
-EXPERIMENT_DIR = "/home/matthias/Projects/Autoformer/results/BTC_Informer_ohlcv_ftS_sl60_ll60_pl15_dm512_nh8_el2_dl1_df2048_fc3_ebtimeF_dtTrue_'Exp'_0"
-CLASS_BORDER = {"short": 0.0, "long": 0.05}
+EXPERIMENT_DIR = r"D:\Mine\Autoformer\results\Exchange_96_96_Informer_ohlcv_ftS_sl40_ll20_pl10_dm512_nh8_el2_dl1_df2048_fc3_ebtimeF_dtTrue_'FixPctContinuity'_0"
+CLASS_BORDER = {"short": -0.03, "long": 0.03}
 EVAL_DIR = "eval_results"
 SAMPLE_LIMIT = None
 # RAW_DATA_FILE = "/home/matthias/Projects/Trading/data/dax/BAYN.DE_hourly.csv"
 # RAW_DATA_FILE = "/home/matthias/Projects/Trading/data/crypto/ETH-USD_hourly.csv"
-RAW_DATA_FILE = "/home/matthias/Projects/Autoformer/dataset/btc_usd/BTC-Hourly.csv"
+RAW_DATA_FILE = r"D:\Mine\DATA\dataset\btc_usd\BTC-Hourly.csv"
+
 raw_data = pd.read_csv(RAW_DATA_FILE)
+raw_data.date = pd.to_datetime(raw_data.date)
+raw_data = raw_data.sort_values(by='date')
+
 exp_name = EXPERIMENT_DIR.split(os.sep)[-1]
 results_dir = os.path.join(EVAL_DIR, exp_name)
 metrics_file = os.path.join(results_dir, "{}.txt".format(exp_name))
@@ -45,7 +49,7 @@ pred_classes, true_classes, pct_errors, pct_per_step = eval_per_predicted_step(p
 
 c_metrics = create_classification_metrics_per_step(pred_classes, true_classes)
 e_metrics = create_error_metrics_per_step(pct_errors)
-write_metrics_to_file(metrics_file, {**c_metrics, **e_metrics}, CLASS_BORDER)
+# write_metrics_to_file(metrics_file, {**c_metrics, **e_metrics}, CLASS_BORDER)
 plot_metrics_per_step(c_metrics, save_name=os.path.join(results_dir, "classification_metrics.png"))
 plot_metrics_per_step(e_metrics, save_name=os.path.join(results_dir, "error_metrics.png"))
 
