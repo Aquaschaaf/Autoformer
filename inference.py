@@ -4,16 +4,27 @@ import json
 import os
 import numpy as np
 import pandas as pd
+from plotly.offline import plot
+
 from utils.timefeatures import time_features
 import argparse
+import itertools
 import vectorbt as vbt
 import matplotlib.pyplot as plt
+
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support, confusion_matrix
 
 from run import parse_arguments, build_settings_str_from_args
 from exp.exp_inference import Exp_Inference
 from models import Informer, Autoformer, Transformer, Reformer
 from data_provider.data_factory import data_provider
 
+PREDICTION_COL = "Prediction"
+GT_COL = "GT"
+
+GT_SELL_THRESH = -0.01
+GT_BUY_THRESH = 0.01
 
 def args_inference():
     N_MODEL_ITERATIONS = 1
@@ -90,8 +101,8 @@ def backtest(df):
 
     best_total_return = -10000
     best_pf = None
-    best_threshhods = {"buy": None, "sell": None, "stop_loss": None}
-    num_thresh_candidates = 5
+    best_thresholds = {"buy": None, "sell": None, "stop_loss": None}
+    num_thresh_candidates = 10
     for i in range(num_thresh_candidates):
         for j in range(num_thresh_candidates):
             for k in range(num_thresh_candidates):
@@ -100,39 +111,224 @@ def backtest(df):
                 sell_thresh = -j/100.
                 stop_loss = (k+3)/100.
 
-                entries, exits = create_signals(df['predicted_pct_diff'], buy_thresh=buy_thresh, sell_thresh=sell_thresh)
-                pf = vbt.Portfolio.from_signals(df["Close"], entries=entries, exits=exits, sl_stop=stop_loss, slippage=0.0025)  #   , slippage=0.0025, fixed_fees=0.5,
+                entries, exits = create_signals(df[PREDICTION_COL], buy_thresh=buy_thresh, sell_thresh=sell_thresh)
+                pf = vbt.Portfolio.from_signals(df["Close"], entries=entries, exits=exits, sl_stop=stop_loss)  #   , slippage=0.0025, fixed_fees=0.5,
                 # tr = pf.stats()["Win Rate [%]"]  #
-                tr= pf.total_return()
+                tr = pf.total_return()
                 print("B {}, S {}, StopLoss {}: {}".format(buy_thresh, sell_thresh, stop_loss, tr))
 
                 if tr > best_total_return:
                     best_pf = pf
                     best_total_return = tr
-                    best_threshhods["buy"] = buy_thresh
-                    best_threshhods["sell"] = sell_thresh
-                    best_threshhods["sell"] = sell_thresh
-                    best_threshhods["stop_loss"] = stop_loss
+                    best_thresholds["buy"] = buy_thresh
+                    best_thresholds["sell"] = sell_thresh
+                    best_thresholds["stop_loss"] = stop_loss
 
-    print("Best Thresholds: {}".format(best_threshhods))
+    print("Best Thresholds: {}".format(best_thresholds))
     stats = best_pf.stats()
     print(stats)
+
     best_pf.plot().show()
+
+    return best_pf, best_thresholds
+
+
+def find_best_class_threshold(predictions, true_values, thresholds):
+
+    use_precision = False
+
+    best_metric_value = 0
+    best_threshold = None
+    # Find best value for high threshold
+    for thresh_vals in thresholds:
+
+        pred_classes = assign_classes(predictions, thresh_vals["sell"], thresh_vals["buy"])
+        # true_classes = assign_classes(true_values, GT_SELL_THRESH, GT_BUY_THRESH)
+        true_classes = assign_classes(true_values, thresh_vals["sell"], thresh_vals["buy"])
+
+        # Calculate metrics
+        if use_precision:
+            precision, recall, f1, _ = precision_recall_fscore_support(true_classes, pred_classes, average=None,
+                                                                       labels=[-1, 0, 1])
+            metric = precision[0] + precision[-1]
+        else:
+            conf_matrix = confusion_matrix(true_classes, pred_classes, labels=[-1, 0, 1])
+            metric = conf_matrix[-1, -1] + conf_matrix[0, 0] - (conf_matrix[0, -1] / 1) #+ conf_matrix[1, 1] #
+
+        if metric > best_metric_value:
+            best_metric_value = metric
+            best_threshold = thresh_vals
+
+        #print("Threshold values: {}. Metric: {}".format(thresh_vals, metric))
+
+    print("Best Threshold: {}. Metric: {}".format(best_threshold, best_metric_value))
+    return best_threshold
+
+
+def generate_classification_metrics(df, best_thresholds=None):
+
+    if best_thresholds is None:
+        param_grid = {
+            "sell": [-x / 100.0 for x in range(1, 11)],
+            "buy": [x / 100.0 for x in range(1, 11)],
+        }
+        keys, values = zip(*param_grid.items())
+        param_combinations = [dict(zip(keys, v)) for v in itertools.product(*values)]
+        best_thresholds = find_best_class_threshold(df[PREDICTION_COL], df[GT_COL], param_combinations)
+
+    accuracy, precision, recall, f1, conf_matrix = evaluate_classification(df[PREDICTION_COL],
+                                                                           df[GT_COL],
+                                                                           best_thresholds["sell"],
+                                                                           best_thresholds["buy"])
+
+    print("Precision with both best thresholds {}: {}".format(best_thresholds, precision))
+    plot_confusion_matrix(conf_matrix, classes=[-1, 0, 1])
+
+    metrics = {
+        "best_threshold": best_thresholds,
+        "accuracy": accuracy,
+        "precision": precision,
+        "recall": recall,
+        "f1": f1,
+        "conf_matrix": conf_matrix
+    }
+    return metrics
+
+def assign_classes(values, threshold_low, threshold_high):
+    """Assign classes based on thresholds."""
+    return np.select(
+        [values < threshold_low, values <= threshold_high, values > threshold_high],
+        [-1, 0, 1]
+    )
+
+
+def evaluate_classification(predictions, true_values, threshold_low, threshold_high):
+    """Evaluate the classification using various metrics."""
+    pred_classes = assign_classes(predictions, threshold_low, threshold_high)
+    # true_classes = assign_classes(true_values, GT_SELL_THRESH, GT_BUY_THRESH)
+    true_classes = assign_classes(true_values, threshold_low, threshold_high)
+
+    # Calculate metrics
+    accuracy = accuracy_score(true_classes, pred_classes)
+    precision, recall, f1, _ = precision_recall_fscore_support(true_classes, pred_classes, average=None,
+                                                               labels=[-1, 0, 1])
+    conf_matrix = confusion_matrix(true_classes, pred_classes, labels=[-1, 0, 1])
+
+    return accuracy, precision, recall, f1, conf_matrix
+
+
+def plot_confusion_matrix(cm, classes, title='Confusion matrix', cmap=plt.cm.Blues):
+    """This function prints and plots the confusion matrix."""
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title(title)
+    plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=45)
+    plt.yticks(tick_marks, classes)
+
+    cm_norm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+
+    thresh = cm.max() / 3.
+    for i, j in enumerate(classes):
+        for k, class_label in enumerate(classes):
+            plt.text(i, k, f"{cm_norm[k][i]:.2f}\n{cm[k][i]}",
+                     horizontalalignment="center",
+                     color="black")
+
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+
+def generate_metrics(df, best_thresholds=None):
+
+
+    df = df[df[GT_COL].notnull()]
+
+    # Calculate evaluation metrics
+    mae = mean_absolute_error(df[GT_COL], df[PREDICTION_COL])
+    mse = mean_squared_error(df[GT_COL], df[PREDICTION_COL])
+    rmse = np.sqrt(mse)
+    r_squared = r2_score(df[GT_COL], df[PREDICTION_COL])
+    classi_metrics = generate_classification_metrics(df, best_thresholds)
+
+    # Print the results
+    print("Mean Absolute Error (MAE):", mae)
+    print("Mean Squared Error (MSE):", mse)
+    print("Root Mean Squared Error (RMSE):", rmse)
+    print("R-squared:", r_squared)
+
+    all_metrics = {}
+    all_metrics["regression"] = {
+        "mae": mae,
+        "mse": mse,
+        "rmse": rmse,
+        "r_squared": r_squared
+    }
+    all_metrics["classification"] = classi_metrics
+
+    return all_metrics
+
+
+
+def summarize(best_thresholds, pf, metrics, out_dir, meta_info):
+
+    def format_conf_mat(mat, suffix=None):
+        # Creating a format string: adjust precision and width as needed
+        # This format string sets up spaces for alignment: right-aligned by default
+        if mat.shape != (3, 3):
+            raise ValueError("Input must be a 3x3 matrix.")
+        formatter = "{:>10.4f} {:>10.4f} {:>10.4f}\n"
+        formatted_string = "Confusion Matrix\n" if suffix is None else "Confusion Matrix {}\n".format(suffix)
+        for row in mat:
+            # Append each formatted row to the formatted_string
+            formatted_string += formatter.format(*row)
+        return formatted_string
+
+    def create_section_header(name):
+        out_str = ''
+        sep_line = "\n===========================================\n"
+        out_str += sep_line
+        out_str += name.upper()
+        out_str += sep_line
+        return out_str
+
+
+    out_file = os.path.join(out_dir, "evaluation_summary.txt")
+    plot(pf.plot(), filename=os.path.join(out_dir, 'portfolio.html'))
+
+    with open(out_file, "w") as file:
+        for info_name, info in meta_info.items():
+            file.write("{}: {}\n".format(info_name, info))
+        file.write(create_section_header("used thresholds"))
+        file.write("{}\n".format(best_thresholds))
+        for task, task_metrics in metrics.items():
+            file.write(create_section_header(task))
+            for metric_name, metric_val in task_metrics.items():
+                if metric_name == "conf_matrix":
+                    file.write(format_conf_mat(metric_val))
+                    conf_mat_normed = metric_val.astype('float') / metric_val.sum(axis=1)[:, np.newaxis]
+                    file.write(format_conf_mat(conf_mat_normed, suffix="Normed"))
+                else:
+                    file.write("{}: {}\n".format(metric_name, metric_val))
+        file.write("\n")
+        file.write(create_section_header("PORTFOLIO STATS"))
+        file.write(pf.stats().to_string())
 
 
 if __name__ == "__main__":
 
     CREATE_PREDICTION_DATA = False
-    OUT_DIR = "results"
-    MODEL_DIR = "D:\Mine\Autoformer\checkpoints\Exchange_96_96_Informer_ohlcv_ftS_sl40_ll20_pl10_dm512_nh8_el2_dl1_df2048_fc3_ebtimeF_dtTrue_'FixPctContinuity'_0"
+    BASE_OUT_DIR = "results"
+    MODEL_DIR = "/home/matthias/Projects/Autoformer/checkpoints/BTC_Informer_ohlcv_ftS_sl60_ll20_pl10_dm512_nh8_el2_dl1_df2048_fc3_ebtimeF_dtTrue_'des'_0"
     # DATA_FILE = r"D:\Mine\DATA\data\dax\BAYN.DE_hourly.csv"
     # DATA_FILE = r"D:\Mine\DATA\data\dax\BMW.DE_hourly.csv"
     # DATA_FILE = r"D:\Mine\DATA\data\crypto\ETH-USD_hourly.csv"
-    DATA_FILE = r"D:\Mine\DATA\data\crypto\BTC-USD_hourly.csv"
+    DATA_FILE = r"/home/matthias/Projects/Autoformer/dataset/btc_usd/BTC-Hourly.csv"
 
     model_name = MODEL_DIR.split(os.sep)[-1]
     data_name = DATA_FILE.split(os.sep)[-1].split(".")[0]
-    out_file = os.path.join(OUT_DIR, model_name, "{}_predictions.csv".format(data_name))
+    out_dir = os.path.join(BASE_OUT_DIR, model_name)
+    out_file = os.path.join(out_dir, "{}_predictions.csv".format(data_name))
 
     data = pd.read_csv(DATA_FILE)
     data["date"] = pd.to_datetime(data["date"], errors='coerce')
@@ -146,6 +342,7 @@ if __name__ == "__main__":
     if CREATE_PREDICTION_DATA:
         predictor = PredictionModel(MODEL_DIR)
         predictor.args.data_path = os.path.basename(DATA_FILE)
+        predictor.args.is_training = False
 
         seq_length = predictor.args.seq_len
         label_length = predictor.args.label_len
@@ -187,8 +384,8 @@ if __name__ == "__main__":
             predicted_diff_pct = outputs[-1] - seq_x[-1]
             true_diff_pct = seq_y[-1] - seq_x[-1] if i < max_range - pred_length else [None]
             results[datetime.iloc[-1]] = {
-                "predicted_pct_diff": predicted_diff_pct[0],
-                "true_diff_pct": true_diff_pct[0]
+                PREDICTION_COL: predicted_diff_pct[0],
+                GT_COL: true_diff_pct[0]
             }
 
         df = pd.DataFrame(results).transpose()
@@ -200,6 +397,13 @@ if __name__ == "__main__":
 
     df.date = pd.to_datetime(df.date).dt.tz_localize(None)
     data = data.merge(df, how="outer")
-    data = data[data['predicted_pct_diff'].notnull()]
+    data = data[data[PREDICTION_COL].notnull()]
 
-    backtest(data)
+    pf, best_thresholds = backtest(data)
+    metrics = generate_metrics(data, best_thresholds)
+
+    meta_info = {"Model": MODEL_DIR, "Dataset": DATA_FILE}
+    summarize(best_thresholds, pf, metrics, out_dir, meta_info)
+
+    plt.show()
+
